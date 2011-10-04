@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:baselineAligned="false" android:id="@+id/filterBarLayout" android:orientation="horizontal">
+        <EditText 
+            android:layout_gravity="left" 
+            android:layout_weight="0.20" 
+            android:id="@+id/filterTextField" 
+            android:layout_height="match_parent"
+            android:maxLines="1"
+            android:layout_width="fill_parent" 
+            android:typeface="normal" 
+            android:hint="type to filter"
+            android:inputType="text"
+            >
+            <requestFocus/>
+        </EditText>
+        <Button android:layout_height="wrap_content" android:layout_width="wrap_content" android:id="@+id/clearFilterButton" android:text="@string/clear_filter_action"></Button>
+    </LinearLayout>
+    <ListView android:layout_height="wrap_content" android:layout_width="match_parent" android:id="@+id/optionsListView" android:focusable="true" android:focusableInTouchMode="true"></ListView>
+    
+</LinearLayout>

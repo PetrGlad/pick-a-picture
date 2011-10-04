@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alphabeticShortcut="1" android:titleCondensed="Choose this file" android:title="Choose this file" android:id="@+id/item_choose_ok"></item>
+    
+</menu>
