@@ -1,5 +1,8 @@
 package petrglad.pickapicture.util;
 
+import static com.google.common.collect.Iterators.concat;
+import static com.google.common.collect.Iterators.singletonIterator;
+
 import java.io.File;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -13,10 +16,10 @@ import com.google.common.collect.Iterators;
 public class FileTreeIterator implements Iterator<File> {
 
     final Queue<Iterator<File>> dirQueue = new LinkedList<Iterator<File>>();
-    final Iterator<File> i = Iterators.concat(new QueueIterator<Iterator<File>>(dirQueue));
+    final Iterator<File> i = concat(new QueueIterator<Iterator<File>>(dirQueue));
 
     public FileTreeIterator(File root) {
-        handleDir(root);
+        dirQueue.add(singletonIterator(root));
     }
 
     @Override
