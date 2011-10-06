@@ -1,0 +1,10 @@
+It is a test task given by a potential employer.
+
+Task required inserting images into a html file. Images can be taken from camera or from a file on sd card.
+File selection should be filterable by file name and scan for image files should be in background so UI does not block.
+Filtered results should be also updated dynamically when new pictures are found.
+
+TODO
+    Use Filterable on file list view and cache scan results.
+
+    
