@@ -1,6 +1,5 @@
 package petrglad.pickapicture;
 
-import static com.google.common.base.Predicates.and;
 import static com.google.common.collect.Iterators.filter;
 
 import java.io.File;
@@ -15,8 +14,11 @@ import java.util.concurrent.TimeUnit;
 
 import petrglad.pickapicture.util.BrakeIterator;
 import petrglad.pickapicture.util.FileTreeIterator;
+import petrglad.pickapicture.util.LazyIterable;
 import petrglad.pickapicture.util.StopIterationException;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
@@ -36,9 +38,9 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
 
@@ -160,6 +162,8 @@ public class ChooseFileActivity extends Activity {
             });
 
     volatile Runnable scanWorker;
+
+    private Iterable<File> fileList;
     FileListAdapter listData;
     protected Thread worker;
     private ListView listView;
@@ -192,14 +196,34 @@ public class ChooseFileActivity extends Activity {
         listView.setAdapter(listData);
 
         listView.setOnItemClickListener(new OnItemClickListener() {
+            // TODO Extract this class (too bulky already)
             @Override
             public void onItemClick(AdapterView<?> arg0, View arg1, int arg2, long arg3) {
                 Log.v(TAG, "onItemClick " + arg2 + ", " + arg3);
-                // TODO Show ok/cancel dialog here and return activity result
-                // here if confirmed.
-                Toast.makeText(getApplicationContext(),
-                        "Selected " + getItemFile(arg3) + "\nUse menu to confirm choise.",
-                        Toast.LENGTH_LONG).show();
+                // Toast.makeText(getApplicationContext(),
+                // "Selected " + getItemFile(arg3) +
+                // "\nUse menu to confirm choise.",
+                // Toast.LENGTH_LONG).show();
+
+                String selected = getItemFile(arg3);
+                new AlertDialog.Builder(ChooseFileActivity.this)
+                        .setIcon(android.R.drawable.ic_dialog_alert)
+                        .setTitle("Confirm file choice")
+                        .setMessage("Choose file " + selected)
+                        .setPositiveButton(android.R.string.yes,
+                                new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        Intent intent = getIntent();
+                                        intent.putExtra(RESULT_FILE_NAME_PROPERTY,
+                                                getItemFile(selectedRowId));
+                                        setResult(RESULT_OK, intent);
+                                        finish();
+                                    }
+                                })
+                        .setNegativeButton(android.R.string.no, null)
+                        .show();
+
                 selectedRowId = arg3;
             }
         });
@@ -220,6 +244,15 @@ public class ChooseFileActivity extends Activity {
             }
         });
 
+        final File root = new File("/mnt/sdcard");
+        if (!root.isDirectory() || !root.canRead())
+            Log.e(TAG, "Can not scan " + root.getAbsolutePath());
+        else {
+            // TODO Keep scan results when screen is rotated: save/restore state
+            // of this on destroy/create
+            fileList = new LazyIterable<File>(filter(new FileTreeIterator(root),
+                    new IsPictureFile()));
+        }
         setNamePattern("");
     }
 
@@ -247,19 +280,24 @@ public class ChooseFileActivity extends Activity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (R.id.item_choose_ok == item.getItemId()) {
-            stopScanner();
-            Intent intent = this.getIntent();
-            if (selectedRowId == ListView.INVALID_ROW_ID) {
-                Toast.makeText(getApplicationContext(), "No file chosen.", Toast.LENGTH_SHORT)
-                        .show();
-            } else {
-                intent.putExtra(RESULT_FILE_NAME_PROPERTY, getItemFile(selectedRowId));
-                this.setResult(RESULT_OK, intent);
-                finish();
-            }
-            return true;
-        } else
+        // TODO Implement refresh/rescan button and it's action (throw away scan
+        // results in fileList and start scanning over)
+
+        // if (R.id.item_choose_ok == item.getItemId()) {
+        // stopScanner();
+        // if (selectedRowId == ListView.INVALID_ROW_ID) {
+        // Toast.makeText(getApplicationContext(), "No file chosen.",
+        // Toast.LENGTH_SHORT)
+        // .show();
+        // } else {
+        // Intent intent = this.getIntent();
+        // intent.putExtra(RESULT_FILE_NAME_PROPERTY,
+        // getItemFile(selectedRowId));
+        // this.setResult(RESULT_OK, intent);
+        // finish();
+        // }
+        // return true;
+        // } else
             return super.onOptionsItemSelected(item);
     }
 
@@ -281,11 +319,8 @@ public class ChooseFileActivity extends Activity {
             @Override
             public void run() {
                 // TODO Split this procedure and extract scanner class
-                final File root = new File("/mnt/sdcard");
-                if (!root.isDirectory() || !root.canRead())
-                    Log.e(TAG, "Can not scan " + root.getAbsolutePath());
-                else {
-                    Log.v(TAG, "Started iteration #" + hashCode());
+                if (fileList != null) {
+                    Log.v(TAG, "Started scanning #" + hashCode());
                     try {
                         final Object r = this;
                         Supplier<Boolean> canContinue = new Supplier<Boolean>() {
@@ -294,15 +329,17 @@ public class ChooseFileActivity extends Activity {
                                 return ChooseFileActivity.this.scanWorker == r;
                             }
                         };
-                        final Predicate<File> fileFilter = nameFileFilter == null ?
-                                new IsPictureFile() : and(new IsPictureFile(), nameFileFilter);
-                        // BrakeIterator is used to stop this procedure sooner
-                        // (for faster re-scans).
-                        final Iterator<File> i = filter(new BrakeIterator<File>(
-                                new FileTreeIterator(root), canContinue), fileFilter);
+                        // TODO BrakeIterator was used to stop this procedure
+                        // sooner (for faster re-scans). Now we might not need
+                        // it here
+                        final Iterator<File> i = filter(
+                                new BrakeIterator<File>(fileList.iterator(), canContinue),
+                                nameFileFilter == null ?
+                                        Predicates.<File> alwaysTrue()
+                                        : nameFileFilter);
 
-                        // TODO Cache full scan results for faster re-filtering
-                        // TODO Keep scan results when screen is rotated
+                        // TODO Scan in background (in this thread) but use
+                        // Filterable in list adapter to filter results.
 
                         // Batch updates to not update UI too often
                         long flushTime = System.currentTimeMillis();
@@ -311,7 +348,7 @@ public class ChooseFileActivity extends Activity {
                             long now = System.currentTimeMillis();
                             // XXX This does not work well if there are long
                             // pauses between results.
-                            if (flushTime + 1500 < now) {
+                            if (flushTime + 1000 < now) {
                                 flushTime = now;
                                 listData.add(batch);
                                 batch = new ArrayList<File>();
@@ -327,9 +364,9 @@ public class ChooseFileActivity extends Activity {
                                 }
                             });
                         }
-                        Log.v(TAG, "Finished iteration #" + hashCode());
+                        Log.v(TAG, "Finished scanning #" + hashCode());
                     } catch (StopIterationException e) {
-                        Log.v(TAG, "Aborted iteration #" + hashCode(), e);
+                        Log.v(TAG, "Aborted scanning #" + hashCode(), e);
                     }
                 }
             }

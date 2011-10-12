@@ -4,16 +4,19 @@ import static com.google.common.collect.Iterators.concat;
 import static com.google.common.collect.Iterators.singletonIterator;
 
 import java.io.File;
+import java.io.Serializable;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Queue;
 
+import com.google.common.base.Supplier;
 import com.google.common.collect.Iterators;
 
 /**
  * Iterator that lists all nested files and directories in given root.
  */
-public class FileTreeIterator implements Iterator<File> {
+public class FileTreeIterator implements Iterator<File>, Serializable {
+    private static final long serialVersionUID = 1L;
 
     final Queue<Iterator<File>> dirQueue = new LinkedList<Iterator<File>>();
     final Iterator<File> i = concat(new QueueIterator<Iterator<File>>(dirQueue));
@@ -34,11 +37,20 @@ public class FileTreeIterator implements Iterator<File> {
         return f;
     }
 
-    public void handleDir(File f) {
+    public void handleDir(final File f) {
         if (f.isDirectory()) {
-            File[] list = f.listFiles();
-            if (list != null)
-                dirQueue.offer(Iterators.forArray(list));
+            // Directory is scanned on-demand to not fill queue more than
+            // necessary
+            dirQueue.offer(new LazyIterator<File>(new Supplier<Iterator<File>>() {
+                @Override
+                public Iterator<File> get() {
+                    File[] list = f.listFiles();
+                    if (list != null)
+                        return Iterators.forArray(list);
+                    else
+                        return Iterators.emptyIterator();
+                }
+            }));
         }
     }
 
